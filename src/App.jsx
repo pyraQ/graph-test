@@ -11,40 +11,7 @@ import ReactFlow, {
   useNodesState
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-
-const sampleJson = {
-  servers: [
-    {
-      serverName: 'Order Server',
-      serverId: 'S1',
-      serverAddress: '10.0.0.1',
-      channels: [
-        {
-          channelName: 'OrderCreatedChannel',
-          rxIdentifiers: ['PAYMENT_SERVICE', 'SHIPPING_SERVICE'],
-          txIdentifiers: ['ORDER_SERVICE']
-        },
-        {
-          channelName: 'OrderCancelChannel',
-          rxIdentifiers: ['REFUND_SERVICE'],
-          txIdentifiers: ['ORDER_SERVICE']
-        }
-      ]
-    },
-    {
-      serverName: 'Payment Server',
-      serverId: 'S2',
-      serverAddress: '10.0.0.2',
-      channels: [
-        {
-          channelName: 'PaymentCompletedChannel',
-          rxIdentifiers: ['ORDER_SERVICE'],
-          txIdentifiers: ['PAYMENT_SERVICE']
-        }
-      ]
-    }
-  ]
-};
+import sampleJson from './data/sample.json';
 
 const elk = new ELK();
 
