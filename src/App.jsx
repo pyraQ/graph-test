@@ -1,5 +1,4 @@
-import React from 'react';
-import { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import ReactFlow, {
   Background,
@@ -50,7 +49,9 @@ const sampleJson = {
 const elk = new ELK();
 
 function ChannelNode({ data }) {
-  const { channelName, txIdentifiers, rxIdentifiers } = data;
+  const { channelName, txIdentifiers, rxIdentifiers, selectedService } = data;
+  const isSelected = (service) => selectedService === service;
+  const isDimmed = (service) => selectedService && selectedService !== service;
 
   return (
     <div className="channel-node">
@@ -60,7 +61,10 @@ function ChannelNode({ data }) {
         <div className="channel-column">
           <div className="channel-column-label">TX</div>
           {txIdentifiers.map((id) => (
-            <div key={`${channelName}-tx-${id}`} className="chip tx-chip">
+            <div
+              key={`${channelName}-tx-${id}`}
+              className={`chip tx-chip ${isSelected(id) ? 'chip-highlight' : ''} ${isDimmed(id) ? 'chip-dimmed' : ''}`}
+            >
               {id}
             </div>
           ))}
@@ -68,7 +72,10 @@ function ChannelNode({ data }) {
         <div className="channel-column">
           <div className="channel-column-label">RX</div>
           {rxIdentifiers.map((id) => (
-            <div key={`${channelName}-rx-${id}`} className="chip rx-chip">
+            <div
+              key={`${channelName}-rx-${id}`}
+              className={`chip rx-chip ${isSelected(id) ? 'chip-highlight' : ''} ${isDimmed(id) ? 'chip-dimmed' : ''}`}
+            >
               {id}
             </div>
           ))}
@@ -91,12 +98,19 @@ function ServerHeaderNode({ data }) {
 }
 
 function IdentifierNode({ data }) {
+  const isActive = data.selectedService === data.label;
+
   return (
-    <div className="identifier-node">
+    <button
+      type="button"
+      className={`identifier-node ${isActive ? 'identifier-node-active' : ''}`}
+      onClick={() => data.onServiceClick?.(data.label)}
+      title="클릭해서 해당 Service 하이라이트"
+    >
       <Handle type="target" position={Position.Left} />
       <div>{data.label}</div>
       <Handle type="source" position={Position.Right} />
-    </div>
+    </button>
   );
 }
 
@@ -248,6 +262,7 @@ function FlowCanvas() {
   const initialGraph = useMemo(() => jsonToGraph(sampleJson), []);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialGraph.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialGraph.edges);
+  const [selectedService, setSelectedService] = useState(null);
 
   useEffect(() => {
     const run = async () => {
@@ -265,25 +280,63 @@ function FlowCanvas() {
     run();
   }, [initialGraph, setEdges, setNodes]);
 
+  const interactiveNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        if (node.type === 'channelNode') {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              selectedService
+            }
+          };
+        }
+
+        if (node.type === 'identifierNode') {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              selectedService,
+              onServiceClick: (service) =>
+                setSelectedService((current) => (current === service ? null : service))
+            }
+          };
+        }
+
+        return node;
+      }),
+    [nodes, selectedService]
+  );
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      nodeTypes={{
-        channelNode: ChannelNode,
-        serverHeader: ServerHeaderNode,
-        identifierNode: IdentifierNode
-      }}
-      fitView
-      minZoom={0.2}
-      maxZoom={1.8}
-      defaultEdgeOptions={{ animated: true }}
-    >
-      <Background />
-      <Controls />
-    </ReactFlow>
+    <>
+      <div className="toolbar">
+        <span>Service를 클릭하면 모든 채널에서 동일 식별자가 하이라이트됩니다.</span>
+        <button type="button" onClick={() => setSelectedService(null)} disabled={!selectedService}>
+          하이라이트 초기화
+        </button>
+      </div>
+      <ReactFlow
+        nodes={interactiveNodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={{
+          channelNode: ChannelNode,
+          serverHeader: ServerHeaderNode,
+          identifierNode: IdentifierNode
+        }}
+        fitView
+        minZoom={0.2}
+        maxZoom={1.8}
+        defaultEdgeOptions={{ animated: true }}
+      >
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </>
   );
 }
 
