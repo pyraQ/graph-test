@@ -101,18 +101,20 @@ function IdentifierNode({ data }) {
   const isActive = data.selectedService === data.label;
 
   return (
-    <button
-      type="button"
-      className={`identifier-node ${isActive ? 'identifier-node-active' : ''}`}
-      onClick={() => data.onServiceClick?.(data.label)}
-      title="클릭해서 해당 Service 하이라이트"
-    >
+    <div className={`identifier-node ${isActive ? 'identifier-node-active' : ''}`} title="클릭해서 해당 Service 하이라이트">
       <Handle type="target" position={Position.Left} />
       <div>{data.label}</div>
       <Handle type="source" position={Position.Right} />
-    </button>
+    </div>
   );
 }
+
+
+const NODE_TYPES = {
+  channelNode: ChannelNode,
+  serverHeader: ServerHeaderNode,
+  identifierNode: IdentifierNode
+};
 
 export function jsonToGraph(json) {
   const nodes = [];
@@ -298,9 +300,7 @@ function FlowCanvas() {
             ...node,
             data: {
               ...node.data,
-              selectedService,
-              onServiceClick: (service) =>
-                setSelectedService((current) => (current === service ? null : service))
+              selectedService
             }
           };
         }
@@ -323,10 +323,12 @@ function FlowCanvas() {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        nodeTypes={{
-          channelNode: ChannelNode,
-          serverHeader: ServerHeaderNode,
-          identifierNode: IdentifierNode
+        nodeTypes={NODE_TYPES}
+        onNodeClick={(_, node) => {
+          if (node.type === 'identifierNode') {
+            const service = node.data?.label;
+            setSelectedService((current) => (current === service ? null : service));
+          }
         }}
         fitView
         minZoom={0.2}
