@@ -1,3 +1,4 @@
+import React from 'react';
 import { useEffect, useMemo } from 'react';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import ReactFlow, {
