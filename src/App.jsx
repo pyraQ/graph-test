@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import ReactFlow, {
   Background,
@@ -78,9 +78,9 @@ function ChannelNode({ data }) {
   );
 }
 
-function ServerGroupNode({ data }) {
+function ServerHeaderNode({ data }) {
   return (
-    <div className="server-group-node">
+    <div className="server-header-node">
       <div className="server-title">{data.serverName}</div>
       <div className="server-subtitle">
         {data.serverId} · {data.serverAddress}
@@ -105,18 +105,36 @@ export function jsonToGraph(json) {
   const identifierSet = new Set();
 
   json.servers.forEach((server) => {
-    const serverNodeId = `server-${server.serverId}`;
+    const serverGroupId = `server-group-${server.serverId}`;
 
     nodes.push({
-      id: serverNodeId,
-      type: 'serverGroup',
+      id: serverGroupId,
+      type: 'group',
+      draggable: true,
+      position: { x: 0, y: 0 },
+      style: {
+        width: 380,
+        height: 120 + server.channels.length * 136,
+        border: '2px solid #4f46e5',
+        borderRadius: 12,
+        background: 'rgba(79, 70, 229, 0.12)'
+      }
+    });
+
+    nodes.push({
+      id: `server-header-${server.serverId}`,
+      type: 'serverHeader',
+      parentNode: serverGroupId,
+      extent: 'parent',
+      draggable: false,
+      selectable: false,
+      position: { x: 12, y: 10 },
       data: {
         serverName: server.serverName,
         serverId: server.serverId,
         serverAddress: server.serverAddress
       },
-      position: { x: 0, y: 0 },
-      style: { width: 350, height: 180 + server.channels.length * 150 }
+      style: { width: 350 }
     });
 
     server.channels.forEach((channel, channelIndex) => {
@@ -124,12 +142,12 @@ export function jsonToGraph(json) {
       nodes.push({
         id: channelNodeId,
         type: 'channelNode',
-        parentNode: serverNodeId,
+        parentNode: serverGroupId,
         extent: 'parent',
         draggable: true,
         position: {
-          x: 20,
-          y: 60 + channelIndex * 130
+          x: 35,
+          y: 70 + channelIndex * 132
         },
         data: {
           channelName: channel.channelName,
@@ -137,7 +155,7 @@ export function jsonToGraph(json) {
           rxIdentifiers: channel.rxIdentifiers
         },
         style: {
-          width: 300
+          width: 310
         }
       });
 
@@ -181,26 +199,29 @@ export function jsonToGraph(json) {
 }
 
 async function applyElkLayout(nodes, edges) {
+  const topLevelNodes = nodes.filter((node) => !node.parentNode);
+  const topLevelNodeIds = new Set(topLevelNodes.map((node) => node.id));
+
   const root = {
     id: 'root',
     layoutOptions: {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
       'elk.spacing.nodeNode': '45',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '80'
+      'elk.layered.spacing.nodeNodeBetweenLayers': '90'
     },
-    children: nodes
-      .filter((node) => !node.parentNode)
-      .map((node) => ({
-        id: node.id,
-        width: node.style?.width ?? 240,
-        height: node.style?.height ?? 80
-      })),
-    edges: edges.map((edge) => ({
-      id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target]
-    }))
+    children: topLevelNodes.map((node) => ({
+      id: node.id,
+      width: node.style?.width ?? 240,
+      height: node.style?.height ?? 80
+    })),
+    edges: edges
+      .filter((edge) => topLevelNodeIds.has(edge.source) && topLevelNodeIds.has(edge.target))
+      .map((edge) => ({
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target]
+      }))
   };
 
   const layout = await elk.layout(root);
@@ -229,9 +250,15 @@ function FlowCanvas() {
 
   useEffect(() => {
     const run = async () => {
-      const layoutedNodes = await applyElkLayout(initialGraph.nodes, initialGraph.edges);
-      setNodes(layoutedNodes);
-      setEdges(initialGraph.edges);
+      try {
+        const layoutedNodes = await applyElkLayout(initialGraph.nodes, initialGraph.edges);
+        setNodes(layoutedNodes);
+        setEdges(initialGraph.edges);
+      } catch (error) {
+        console.error('ELK layout failed; rendering fallback positions.', error);
+        setNodes(initialGraph.nodes);
+        setEdges(initialGraph.edges);
+      }
     };
 
     run();
@@ -245,7 +272,7 @@ function FlowCanvas() {
       onEdgesChange={onEdgesChange}
       nodeTypes={{
         channelNode: ChannelNode,
-        serverGroup: ServerGroupNode,
+        serverHeader: ServerHeaderNode,
         identifierNode: IdentifierNode
       }}
       fitView
